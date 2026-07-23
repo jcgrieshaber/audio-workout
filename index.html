@@ -97,7 +97,7 @@
 
   <div id="startScreen" class="startcard">
     <h2>Plyometrics | Total Body</h2>
-    <p>I'll call out each exercise, run the clock on timed sets, and wait for you to say <b>"done"</b> (or tap the button) on rep-based sets. Say <b>"show video"</b> any time to pull up the demo.</p>
+    <p>I'll call out each exercise, then ask if you want a look at the demo or you're all set — say <b>"ready"</b> (or "start"), or say <b>"video"</b> any time to pull up the clip. On rep-based sets, say <b>"done"</b> (or tap the button) when you finish.</p>
     <div class="mic-row" style="text-align:left;">
       <span class="mic-dot off" id="micDot"></span>
       <span id="micStatus">Mic off</span>
@@ -271,11 +271,15 @@
   // ---------- Speech recognition (best-effort; buttons always work as fallback) ----------
   let recognition = null, micOn = false, micSupported = false;
   let micDenied = false;
+  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(SR){
     micSupported = true;
     recognition = new SR();
-    recognition.continuous = true;
+    // iOS Safari has a known bug where continuous mode can hang or never return results.
+    // Non-continuous + auto-restart-per-phrase is the reliable pattern there.
+    recognition.continuous = !isIOS;
     recognition.interimResults = true; // continuous mode without this can silently stop firing results in some browsers
     recognition.lang = 'en-US';
     recognition.onresult = (e) => {
@@ -295,6 +299,9 @@
       if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
         micDenied = true;
       }
+      // On iOS, "no-speech" fires constantly during normal pauses between phrases — that's
+      // expected in non-continuous mode, not a real failure, so don't treat it as one.
+      if(isIOS && e.error === 'no-speech') return;
       micOn = false;
       micDot.className = 'mic-dot off';
       micStatus.textContent = micDenied
@@ -309,8 +316,13 @@
       logLine('<b>Mic:</b> connected, listening');
     };
     recognition.onend = () => {
-      // No auto-restart, ever — every (re)connection requires an explicit tap.
-      // This is the one thing that can't cause a permission-prompt loop.
+      if(isIOS && micOn && !micDenied){
+        // Expected on iOS: each phrase ends its own session. This is a real standalone page
+        // (not the chat sandbox), so permission persists and restarting here is safe.
+        try{ recognition.start(); }catch(e){}
+        return;
+      }
+      // Everywhere else: no auto-restart — every (re)connection requires an explicit tap.
       micOn = false;
       micDot.className = 'mic-dot off';
       if(!micDenied) micStatus.textContent = 'Mic disconnected — tap Enable mic to reconnect';
@@ -406,7 +418,7 @@
   function promptBeforeStart(){
     phase = 'awaiting-start';
     updateActionButton();
-    const prompt = "Want to see the demo first, or are you ready to dive in?";
+    const prompt = "Let me know if you'd like a look at how it's done, or if you're all set to go.";
     lastAnnouncedText = prompt;
     speak(prompt);
   }
@@ -417,7 +429,7 @@
     if(ex.seconds){
       startWorkTimer(ex.seconds);
     } else {
-      const text = 'Nice — say done, or tap done, when you finish.';
+      const text = 'Nice — whenever you\'re ready.';
       lastAnnouncedText = text;
       speak(text, () => { phase = 'awaiting-done'; updateActionButton(); });
     }
@@ -426,7 +438,7 @@
   function announceSet(){
     const ex = currentEx();
     let text = `Set ${setIdx+1} of ${ex.sets}.`;
-    lastAnnouncedText = text + (ex.seconds ? '' : ` Say done when you finish.`);
+    lastAnnouncedText = text + (ex.seconds ? '' : ` Whenever you're ready.`);
     renderStage();
     speak(lastAnnouncedText, () => {
       if(ex.seconds){ startWorkTimer(ex.seconds); }
@@ -510,10 +522,32 @@
     setTimeout(beginExercise, 900);
   }
 
+  // ---------- Screen wake lock (prevents auto-lock from silently killing the mic mid-workout) ----------
+  let wakeLock = null;
+  async function acquireWakeLock(){
+    if(!('wakeLock' in navigator)) return;
+    try{
+      wakeLock = await navigator.wakeLock.request('screen');
+      logLine('<b>Screen:</b> staying awake during workout');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }catch(e){ /* not fatal — workout still runs, screen just might sleep */ }
+  }
+  function releaseWakeLock(){
+    if(wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    // Wake locks auto-release when the tab is hidden; grab it back once you return
+    // (e.g. after briefly switching apps), so long workouts don't lose it partway through.
+    if(document.visibilityState === 'visible' && !mainScreen.classList.contains('hidden') && !wakeLock){
+      acquireWakeLock();
+    }
+  });
+
   function finishWorkout(){
     speak('That completes the workout page. Nice work.');
     mainScreen.classList.add('hidden');
     doneScreen.classList.remove('hidden');
+    releaseWakeLock();
   }
 
   function onRepeat(){
@@ -521,7 +555,7 @@
   }
   function onVideo(fromVoice){
     const ex = currentEx();
-    if(!ex || !ex.links || !ex.links.length) { speak('No video is linked for this one.'); return; }
+    if(!ex || !ex.links || !ex.links.length) { speak('There\'s nothing to pull up for this one.'); return; }
     const link = ex.links[0];
     const videoLink = $('videoLink'), videoLinkRow = $('videoLinkRow');
     videoLink.href = link.url;
@@ -531,10 +565,10 @@
     if(wasRunning) onPause(true); // stop the clock while you check the video, no separate "Paused" announcement
     if(fromVoice){
       // Browsers block popups triggered from async voice events — surface a real link to tap instead.
-      speak(`Here's the demo link for ${ex.name}.` + (wasRunning ? ' I stopped the clock for you — tap the button, or just let me know when you\'re ready to pick back up.' : ' Tap it to open.'));
+      speak(`Here's the clip link for ${ex.name}.` + (wasRunning ? ' I stopped the clock for you — tap the button, or just let me know when you\'re all set to pick back up.' : ' Tap it to open.'));
     } else {
       // Triggered by an actual button tap, so a direct popup is allowed.
-      speak(`Opening the demo for ${ex.name}.` + (wasRunning ? ' Clock stopped — tap the button when you\'re ready.' : ''));
+      speak(`Opening the clip for ${ex.name}.` + (wasRunning ? ' Clock stopped — tap the button when you\'re set.' : ''));
       window.open(link.url, '_blank', 'noopener,noreferrer');
     }
   }
@@ -609,6 +643,7 @@
   $('startBtn').onclick = () => {
     startScreen.classList.add('hidden');
     mainScreen.classList.remove('hidden');
+    acquireWakeLock();
     // Mic is enabled (or not) via the toggle on the start screen — no auto-start here,
     // so workout narration can't race with a pending permission prompt.
     beginExercise();
