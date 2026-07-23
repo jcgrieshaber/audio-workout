@@ -54,3 +54,615 @@
   .timer-display{font-size:56px;font-weight:900;margin:16px 0 4px;font-variant-numeric:tabular-nums;text-align:center;
     display:none;}
   .timer-display.show{display:block;}
+  .timer-phase{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:2px;text-align:center;
+    color:var(--accent);display:none;}
+  .timer-phase.show{display:block;}
+  .timer-phase.rest{color:var(--success);}
+
+  .caption{margin-top:16px;padding:12px 14px;background:var(--surface-2);border-radius:12px;
+    font-size:13px;color:var(--text);line-height:1.5;min-height:20px;}
+  .caption .label{font-size:9.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;
+    display:block;margin-bottom:4px;}
+
+  .btn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;}
+  .btn{flex:1 1 auto;min-width:100px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    padding:12px 10px;border-radius:12px;font-size:13px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.5px;cursor:pointer;text-align:center;}
+  .btn.primary{background:var(--accent);color:#1a1600;border-color:var(--accent);}
+  .btn.video{border-color:var(--accent);color:var(--accent);}
+  .btn:disabled{opacity:.35;cursor:not-allowed;}
+
+  .startcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px 22px;text-align:center;}
+  .startcard h2{margin:0 0 8px;font-size:18px;text-transform:uppercase;letter-spacing:1px;}
+  .startcard p{color:var(--text-muted);font-size:13px;line-height:1.6;margin:0 0 18px;}
+  .startcard .btn{width:100%;padding:16px;font-size:14px;}
+
+  .log{margin-top:18px;font-size:11px;color:var(--text-muted);}
+  .log .entry{padding:3px 0;border-bottom:1px solid var(--line);}
+  .log .entry b{color:var(--text);}
+
+  .done-screen{text-align:center;padding:50px 20px;}
+  .done-screen .big{font-size:40px;margin-bottom:10px;}
+  .done-screen h2{font-size:20px;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px;}
+  .done-screen p{color:var(--text-muted);font-size:13px;}
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="word">GAME SPEED<span class="sub">AUDIO COACH · DAY 1</span></div>
+  </div>
+
+  <div id="startScreen" class="startcard">
+    <h2>Plyometrics | Total Body</h2>
+    <p>I'll call out each exercise, then ask if you want a look at the demo or you're all set — say <b>"ready"</b> (or "start"), or say <b>"video"</b> any time to pull up the clip. On rep-based sets, say <b>"done"</b> (or tap the button) when you finish.</p>
+    <div class="mic-row" style="text-align:left;">
+      <span class="mic-dot off" id="micDot"></span>
+      <span id="micStatus">Mic off</span>
+      <button id="micToggleBtn">Enable mic</button>
+    </div>
+    <p style="font-size:11px;">Enable the mic above and confirm it says "Listening…" and stays that way — then tap start. Voice is optional; every command also has a button.</p>
+    <button class="btn primary" id="startBtn">▶ Start audio workout</button>
+    <div class="log" id="preStartLog" style="text-align:left;margin-top:16px;"></div>
+  </div>
+
+  <div id="mainScreen" class="hidden">
+    <div class="track-label"><span>Workout progress</span><span id="trackPct">0%</span></div>
+    <div class="track"><div class="track-fill" id="trackFill" style="width:0%"></div></div>
+
+    <div class="stage">
+      <div class="stage-eyebrow" id="sectionName">Plyometrics</div>
+      <div class="stage-name" id="exName">—</div>
+      <div class="stage-presc" id="exPresc">—</div>
+      <div class="stage-setcount" id="setCount"></div>
+
+      <div class="timer-phase" id="timerPhase">Work</div>
+      <div class="timer-display" id="timerDisplay">0:00</div>
+
+      <div class="caption" id="caption"><span class="label">Coach says</span><span id="captionText">Getting ready…</span></div>
+      <div id="videoLinkRow" class="hidden" style="margin-top:10px;">
+        <a id="videoLink" class="btn video" style="display:block;text-decoration:none;" target="_blank" rel="noopener noreferrer">▶ Open demo video</a>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="doneBtn">✓ Done</button>
+        <button class="btn" id="repeatBtn">↻ Repeat</button>
+        <button class="btn video" id="videoBtn">▶ Show video</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="pauseBtn">Pause</button>
+        <button class="btn" id="skipBtn">Skip / Next</button>
+      </div>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <div id="doneScreen" class="done-screen hidden">
+    <div class="big">🏁</div>
+    <h2>Workout page complete</h2>
+    <p>Nice work — every exercise on this page is logged. Move on to Strength/Bodyweight or close this out.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  // ---------- DATA: Day 1, Workout page (Plyometrics / Strength / Auxiliary / Mobility) ----------
+  const SECTIONS = [
+    { name: "Plyometrics", exercises: [
+      { name: "Stationary Pogos", presc: "2 x 10 seconds", sets: 2, seconds: 10,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/power/vertical/pogo-jump/"}] },
+      { name: "Single Leg Broad", presc: "1 x 4 each leg", sets: 1, seconds: null,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/power/horizontal/single-leg-broad-jump/"}] },
+      { name: "Single Leg Lateral Broad", presc: "1 x 4 each leg", sets: 1, seconds: null,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/power/lateral-2/single-leg-lateral-broad/"}] },
+      { name: "Squat Jumps | Lunge Jumps (hands on hips)", presc: "2 x 10 seconds", sets: 2, seconds: 10,
+        links: [
+          {label:"Squat Jump demo", url:"http://overtimeathletes.com/movements/power/vertical/squat-jump/"},
+          {label:"Lunge Jump demo", url:"http://overtimeathletes.com/movements/power/vertical/lunge-jump/"}
+        ]},
+      { name: "Mini Hurdle Lateral Hops", presc: "2 x 10 seconds", sets: 2, seconds: 10,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/power/lateral-2/low-lateral-hurdle-hop/"}] },
+      { name: "Skater Jump (static)", presc: "4 x 4", sets: 4, seconds: null,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/power/lateral-2/skater-jumps/"}] },
+    ]},
+    { name: "Strength", exercises: [
+      { name: "Walking Lunge", presc: "3 x 10 each", sets: 3, seconds: null,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/strength/lower/unilateral-strength/walking-lunges/"}] },
+      { name: "Lateral Monster Walk", presc: "3 x 10 yards — Hip Circle Band", sets: 3, seconds: null,
+        links: [
+          {label:"Watch demo", url:"http://overtimeathletes.com/movements/stretches-activation-2/correctives/lower/lateral-monster-walk/"},
+          {label:"Bands", url:"#"}
+        ]},
+    ]},
+    { name: "Auxiliary", exercises: [
+      { name: "DB Z Press", presc: "3 x 8", sets: 3, seconds: null,
+        links: [{label:"Watch demo", url:"https://movements.overtimeathletes.com/strength/upper/push/vertical/db-z-press/"}] },
+      { name: "Neutral Grip Pulldowns", presc: "3 x 10", sets: 3, seconds: null,
+        links: [{label:"Watch demo", url:"https://movements.overtimeathletes.com/strength/upper/pull/vertical/lat-pull-down/"}] },
+      { name: "Swiss Ball Hamstring Curls", presc: "3 x 10", sets: 3, seconds: null,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/strength/lower/posterior-chain/hamstrings/swiss-ball-hamstring-curl/"}] },
+      { name: "Seated Hammer Curls", presc: "3 x 8", sets: 3, seconds: null,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/strength/upper/arms-2/flexion/hammer-curls/"}] },
+      { name: "Plank", presc: "3 x 45 seconds", sets: 3, seconds: 45,
+        links: [{label:"Watch demo", url:"http://overtimeathletes.com/movements/strength/trunk/static/plank/"}] },
+    ]},
+    { name: "Mobility — Phase 1 Lower Focus A", exercises: [
+      { name: "Kneeling Elevated Tibialis Stretch", presc: "1 x 120 seconds", sets: 1, seconds: 120,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/lower/kneeling-tibial-stretch/"}] },
+      { name: "Kneeling Dorsiflexion Stretch", presc: "1 x 120 seconds", sets: 1, seconds: 120,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/lower/kneeling-dorsiflexion-stretch/"}] },
+      { name: "2 Way Couch Stretch", presc: "1 x 90 seconds each", sets: 1, seconds: 90,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/lower/couch-stretch/"}] },
+      { name: "Half Split", presc: "1 x 90 seconds each", sets: 1, seconds: 90,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/lower/half-split/"}] },
+      { name: "Ankle Rockers", presc: "2 x 10 each side", sets: 2, seconds: null,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/lower/half-kneeling-achilles-ankle-rockers/"}] },
+      { name: "Groiners", presc: "2 x 10 each side", sets: 2, seconds: null,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/dynamic/lower/groiners/"}] },
+      { name: "Straight Leg Raise", presc: "2 x 10 each side", sets: 2, seconds: null,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/dynamic/lower/straight-leg-raise/"}] },
+      { name: "Iron Cross", presc: "2 x 10 each side", sets: 2, seconds: null,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/dynamic/lower/supine-scorpion/"}] },
+      { name: "Scorpions", presc: "2 x 10 each side", sets: 2, seconds: null,
+        links: [{label:"Watch demo", url:"https://overtimeathletes.com/movements/stretches-activation-2/dynamic/lower/scorpion/"}] },
+    ]},
+  ];
+
+  // Flatten into a linear exercise list, keeping section labels
+  const EXERCISES = [];
+  SECTIONS.forEach(sec => sec.exercises.forEach(ex => EXERCISES.push({ ...ex, section: sec.name })));
+  const TOTAL_UNITS = EXERCISES.reduce((sum, e) => sum + e.sets, 0);
+  const REST_SECONDS = 30; // rest between sets of the SAME timed exercise
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const startScreen = $('startScreen'), mainScreen = $('mainScreen'), doneScreen = $('doneScreen');
+  const captionText = $('captionText'), logEl = $('log');
+  const timerDisplay = $('timerDisplay'), timerPhase = $('timerPhase');
+  const micDot = $('micDot'), micStatus = $('micStatus'), micToggleBtn = $('micToggleBtn');
+
+  // ---------- Speech synthesis ----------
+  const synth = window.speechSynthesis || null;
+  let listeningDucked = false; // true while the coach is talking
+  let duckStopping = false; // true when we stopped recognition ourselves to duck, vs. a real disconnect
+  function speak(text, onEnd){
+    logSay(text);
+    captionText.textContent = text;
+    if(micOn && recognition){
+      listeningDucked = true;
+      duckStopping = true;
+      micStatus.textContent = 'Coach speaking…';
+      micDot.className = 'mic-dot off';
+      try{ recognition.stop(); }catch(e){} // actually stop, don't just ignore — prevents buffering our own audio
+    }
+    if(!synth){ if(onEnd) setTimeout(onEnd, 400); return; }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.98; u.pitch = 1.0;
+    u.onend = () => {
+      if(micOn && recognition){
+        // Short beat after speech ends before restarting the mic — avoids catching
+        // the tail end of the coach's own audio still resonating in the room.
+        setTimeout(() => {
+          if(!micOn) return;
+          listeningDucked = false;
+          duckStopping = false;
+          micStatus.textContent = 'Listening…';
+          micDot.className = 'mic-dot live';
+          try{ recognition.start(); }catch(e){}
+        }, 700);
+      }
+      if(onEnd) onEnd();
+    };
+    synth.speak(u);
+  }
+  function logLine(html){
+    [$('preStartLog'), logEl].forEach(panel => {
+      if(!panel) return;
+      const d = document.createElement('div');
+      d.className = 'entry';
+      d.innerHTML = html;
+      panel.prepend(d);
+      while(panel.children.length > 6) panel.removeChild(panel.lastChild);
+    });
+  }
+  function logSay(text){ logLine('<b>Coach:</b> ' + text); }
+  function logHeard(text){ logLine('<b>You:</b> ' + text); }
+
+  // ---------- Speech recognition (best-effort; buttons always work as fallback) ----------
+  let recognition = null, micOn = false, micSupported = false;
+  let micDenied = false;
+  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(SR){
+    micSupported = true;
+    recognition = new SR();
+    // iOS Safari has a known bug where continuous mode can hang or never return results.
+    // Non-continuous + auto-restart-per-phrase is the reliable pattern there.
+    recognition.continuous = !isIOS;
+    recognition.interimResults = true; // continuous mode without this can silently stop firing results in some browsers
+    recognition.lang = 'en-US';
+    recognition.onresult = (e) => {
+      const res = e.results[e.results.length-1];
+      const phrase = res[0].transcript.trim().toLowerCase();
+      if(!res.isFinal){
+        // Show what it's picking up in real time, even before it's final — pure diagnostics, no action taken.
+        micStatus.textContent = listeningDucked ? 'Coach speaking…' : `Hearing: "${phrase}"…`;
+        return;
+      }
+      if(listeningDucked) return; // coach is talking — don't act on anything heard right now
+      logHeard(phrase);
+      handleVoiceCommand(phrase);
+      if(!listeningDucked) micStatus.textContent = 'Listening…';
+    };
+    recognition.onerror = (e) => {
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+        micDenied = true;
+      }
+      // On iOS, "no-speech" fires constantly during normal pauses between phrases — that's
+      // expected in non-continuous mode, not a real failure, so don't treat it as one.
+      if(isIOS && e.error === 'no-speech') return;
+      micOn = false;
+      micDot.className = 'mic-dot off';
+      micStatus.textContent = micDenied
+        ? 'Mic permission blocked — allow it in your browser, then tap Enable mic'
+        : `Mic error: "${e.error}" — tap Enable mic to retry`;
+      micToggleBtn.textContent = 'Enable mic';
+      logLine('<b>Mic error:</b> ' + e.error);
+    };
+    recognition.onstart = () => {
+      micStatus.textContent = 'Listening…';
+      micDot.className = 'mic-dot live';
+      logLine('<b>Mic:</b> connected, listening');
+    };
+    recognition.onend = () => {
+      if(duckStopping){
+        // We stopped this ourselves so the mic can't hear the coach talking — speak()'s
+        // own timer restarts it after a short cooldown. Nothing to do here.
+        return;
+      }
+      if(isIOS && micOn && !micDenied){
+        // Expected on iOS: each phrase ends its own session. This is a real standalone page
+        // (not the chat sandbox), so permission persists and restarting here is safe.
+        try{ recognition.start(); }catch(e){}
+        return;
+      }
+      // Everywhere else: no auto-restart — every (re)connection requires an explicit tap.
+      micOn = false;
+      micDot.className = 'mic-dot off';
+      if(!micDenied) micStatus.textContent = 'Mic disconnected — tap Enable mic to reconnect';
+      micToggleBtn.textContent = 'Enable mic';
+      logLine('<b>Mic:</b> session ended');
+    };
+  } else {
+    micToggleBtn.disabled = true;
+    micStatus.textContent = 'Voice control not supported here — use the buttons';
+  }
+
+  function setMicUI(on){
+    micOn = on;
+    if(on) micDenied = false;
+    micDot.className = 'mic-dot ' + (on ? 'live' : 'off');
+    micStatus.textContent = on ? 'Listening…' : 'Mic off';
+    micToggleBtn.textContent = on ? 'Turn off mic' : 'Enable mic';
+  }
+  micToggleBtn.onclick = () => {
+    if(!micSupported) return;
+    if(!micOn){
+      micDenied = false;
+      try{ recognition.start(); setMicUI(true); }catch(e){ setMicUI(false); }
+    } else {
+      try{ recognition.stop(); }catch(e){}
+      setMicUI(false);
+    }
+  };
+
+  function handleVoiceCommand(phrase){
+    // Word-boundary matches only (no bare "go" — too many false hits from noise),
+    // and every command is gated by whether it's actually valid in the current phase.
+    if(/\b(video|demo)\b/.test(phrase)){ onVideo(true); return; }
+    if(/\b(repeat|again)\b/.test(phrase)){ onRepeat(); return; }
+    if(phase === 'paused'){
+      if(/\b(resume|continue|unpause)\b/.test(phrase)) onResume(true);
+      return; // ignore everything else while paused, including stray "done"/"pause"
+    }
+    if(phase === 'awaiting-start'){
+      if(/\b(ready|start|begin|dive)\b/.test(phrase)) onReady();
+      return; // ignore anything else before the set has actually begun
+    }
+    if(/\b(pause|hold on|wait)\b/.test(phrase)){ onPause(); return; }
+    if(phase === 'awaiting-done' && /\b(done|complete|finished|next)\b/.test(phrase)){ onDone(); return; }
+    if(/\bskip\b/.test(phrase)){ onSkip(); return; }
+  }
+
+  // ---------- Workout state machine ----------
+  let ptr = 0, setIdx = 0, phase = 'idle'; // phase: work | rest | awaiting-done | paused
+  let countdown = 0, tickHandle = null, lastAnnouncedText = '';
+  let pausedFrom = null;
+
+  function currentEx(){ return EXERCISES[ptr]; }
+
+  function unitsCompletedBefore(){
+    let done = 0;
+    for(let i=0;i<ptr;i++) done += EXERCISES[i].sets;
+    done += setIdx;
+    return done;
+  }
+  function updateProgress(){
+    const done = unitsCompletedBefore();
+    const pct = Math.round((done/TOTAL_UNITS)*100);
+    $('trackFill').style.width = pct + '%';
+    $('trackPct').textContent = pct + '%';
+  }
+
+  function renderStage(){
+    const ex = currentEx();
+    if(!ex) return;
+    $('sectionName').textContent = ex.section;
+    $('exName').textContent = ex.name;
+    $('exPresc').textContent = ex.presc;
+    $('setCount').innerHTML = ex.sets > 1 ? `Set <b>${setIdx+1}</b> of ${ex.sets}` : 'Single set';
+    updateProgress();
+  }
+
+  function beginExercise(){
+    if(ptr >= EXERCISES.length){ finishWorkout(); return; }
+    setIdx = 0;
+    $('videoLinkRow').classList.add('hidden');
+    renderStage();
+    announceExercise();
+  }
+
+  function announceExercise(){
+    const ex = currentEx();
+    let text = `${ex.name}. ${ex.presc}.`;
+    if(ex.sets > 1) text += ` ${ex.sets} sets.`;
+    lastAnnouncedText = text;
+    speak(text, () => promptBeforeStart());
+  }
+
+  function promptBeforeStart(){
+    phase = 'awaiting-start';
+    updateActionButton();
+    const prompt = "Let me know if you'd like a look at how it's done, or if you're all set to go.";
+    lastAnnouncedText = prompt;
+    speak(prompt);
+  }
+
+  function onReady(){
+    if(phase !== 'awaiting-start') return;
+    const ex = currentEx();
+    if(ex.seconds){
+      startWorkTimer(ex.seconds);
+    } else {
+      const text = 'Nice — whenever you\'re ready.';
+      lastAnnouncedText = text;
+      speak(text, () => { phase = 'awaiting-done'; updateActionButton(); });
+    }
+  }
+
+  function announceSet(){
+    const ex = currentEx();
+    let text = `Set ${setIdx+1} of ${ex.sets}.`;
+    lastAnnouncedText = text + (ex.seconds ? '' : ` Whenever you're ready.`);
+    renderStage();
+    speak(lastAnnouncedText, () => {
+      if(ex.seconds){ startWorkTimer(ex.seconds); }
+      else { phase = 'awaiting-done'; updateActionButton(); }
+    });
+  }
+
+  function startWorkTimer(seconds){
+    phase = 'work';
+    updateActionButton();
+    countdown = seconds;
+    timerDisplay.classList.add('show');
+    timerPhase.classList.add('show');
+    timerPhase.classList.remove('rest');
+    timerPhase.textContent = 'Work';
+    renderTimer();
+    beep(880);
+    clearInterval(tickHandle);
+    tickHandle = setInterval(tick, 1000);
+  }
+
+  function startRestTimer(){
+    phase = 'rest';
+    updateActionButton();
+    countdown = REST_SECONDS;
+    timerPhase.classList.add('rest');
+    timerPhase.textContent = 'Rest';
+    renderTimer();
+    speak(`Rest ${REST_SECONDS} seconds.`);
+    clearInterval(tickHandle);
+    tickHandle = setInterval(tick, 1000);
+  }
+
+  function renderTimer(){
+    const m = Math.floor(countdown/60), s = countdown%60;
+    timerDisplay.textContent = m + ':' + String(s).padStart(2,'0');
+  }
+
+  function tick(){
+    if(phase !== 'work' && phase !== 'rest') return;
+    countdown--;
+    if(countdown < 0){ advanceAfterTimer(); return; }
+    renderTimer();
+    if(countdown === 3 && phase === 'work') beep(440);
+  }
+
+  function advanceAfterTimer(){
+    clearInterval(tickHandle);
+    if(phase === 'work'){
+      beep(660);
+      setIdx++;
+      const ex = currentEx();
+      if(setIdx >= ex.sets){
+        timerDisplay.classList.remove('show');
+        timerPhase.classList.remove('show');
+        nextExercise();
+      } else {
+        startRestTimer();
+      }
+    } else { // rest finished -> next set of same exercise
+      timerDisplay.classList.remove('show');
+      timerPhase.classList.remove('show');
+      beep(880);
+      announceSet();
+    }
+  }
+
+  function onDone(){
+    if(phase !== 'awaiting-done') return;
+    beep(660);
+    const ex = currentEx();
+    setIdx++;
+    if(setIdx >= ex.sets){ nextExercise(); }
+    else { announceSet(); }
+  }
+
+  function nextExercise(){
+    ptr++;
+    updateProgress();
+    if(ptr >= EXERCISES.length){ finishWorkout(); return; }
+    setTimeout(beginExercise, 900);
+  }
+
+  // ---------- Screen wake lock (prevents auto-lock from silently killing the mic mid-workout) ----------
+  let wakeLock = null;
+  async function acquireWakeLock(){
+    if(!('wakeLock' in navigator)) return;
+    try{
+      wakeLock = await navigator.wakeLock.request('screen');
+      logLine('<b>Screen:</b> staying awake during workout');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }catch(e){ /* not fatal — workout still runs, screen just might sleep */ }
+  }
+  function releaseWakeLock(){
+    if(wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    // Wake locks auto-release when the tab is hidden; grab it back once you return
+    // (e.g. after briefly switching apps), so long workouts don't lose it partway through.
+    if(document.visibilityState === 'visible' && !mainScreen.classList.contains('hidden') && !wakeLock){
+      acquireWakeLock();
+    }
+  });
+
+  function finishWorkout(){
+    speak('That completes the workout page. Nice work.');
+    mainScreen.classList.add('hidden');
+    doneScreen.classList.remove('hidden');
+    releaseWakeLock();
+  }
+
+  function onRepeat(){
+    if(lastAnnouncedText) speak(lastAnnouncedText);
+  }
+  function onVideo(fromVoice){
+    const ex = currentEx();
+    if(!ex || !ex.links || !ex.links.length) { speak('There\'s nothing to pull up for this one.'); return; }
+    const link = ex.links[0];
+    const videoLink = $('videoLink'), videoLinkRow = $('videoLinkRow');
+    const uniqueTarget = 'demo_' + ptr + '_' + Date.now(); // avoids iOS Safari reusing a stale tab from a prior exercise
+    videoLink.href = link.url;
+    videoLink.target = uniqueTarget;
+    videoLink.textContent = `▶ Open demo: ${ex.name}`;
+    videoLinkRow.classList.remove('hidden');
+    const wasRunning = (phase === 'work' || phase === 'rest');
+    if(wasRunning) onPause(true); // stop the clock while you check the video, no separate "Paused" announcement
+    if(fromVoice){
+      // Browsers block popups triggered from async voice events — surface a real link to tap instead.
+      speak(`Here's the clip link for ${ex.name}.` + (wasRunning ? ' I stopped the clock for you — tap the button, or just let me know when you\'re all set to pick back up.' : ' Tap it to open.'));
+    } else {
+      // Triggered by an actual button tap, so a direct popup is allowed.
+      speak(`Opening the clip for ${ex.name}.` + (wasRunning ? ' Clock stopped — tap the button when you\'re set.' : ''));
+      window.open(link.url, uniqueTarget, 'noopener,noreferrer');
+    }
+  }
+  function onPause(silent){
+    if(phase === 'work' || phase === 'rest'){
+      clearInterval(tickHandle);
+      pausedFrom = phase;
+      phase = 'paused';
+      if(!silent) speak('Paused.');
+      $('pauseBtn').textContent = 'Resume';
+      updateActionButton();
+    }
+  }
+  function onResume(fromVoice){
+    if(phase === 'paused'){
+      phase = pausedFrom;
+      if(!fromVoice) speak('Resuming.');
+      clearInterval(tickHandle);
+      tickHandle = setInterval(tick, 1000);
+      $('pauseBtn').textContent = 'Pause';
+      updateActionButton();
+    }
+  }
+  function onSkip(){
+    clearInterval(tickHandle);
+    timerDisplay.classList.remove('show');
+    timerPhase.classList.remove('show');
+    const ex = currentEx();
+    setIdx++;
+    if(setIdx >= ex.sets) nextExercise();
+    else announceSet();
+  }
+
+  function updateActionButton(){
+    const btn = $('doneBtn');
+    if(phase === 'awaiting-start'){
+      btn.textContent = '▶ I\'m ready';
+      btn.onclick = onReady;
+      btn.disabled = false;
+    } else if(phase === 'awaiting-done'){
+      btn.textContent = '✓ Done';
+      btn.onclick = onDone;
+      btn.disabled = false;
+    } else {
+      btn.textContent = '✓ Done';
+      btn.onclick = onDone;
+      btn.disabled = true; // timed work/rest advance on their own
+    }
+  }
+
+  $('doneBtn').onclick = onDone;
+  $('repeatBtn').onclick = onRepeat;
+  $('videoBtn').onclick = () => onVideo(false);
+  $('pauseBtn').onclick = () => { phase === 'paused' ? onResume(false) : onPause(); };
+  $('skipBtn').onclick = onSkip;
+
+  function beep(freq){
+    try{
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.connect(gain); gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(); osc.stop(ctx.currentTime + 0.4);
+    }catch(e){}
+  }
+
+  // ---------- Start flow ----------
+  $('startBtn').onclick = () => {
+    startScreen.classList.add('hidden');
+    mainScreen.classList.remove('hidden');
+    acquireWakeLock();
+    // Mic is enabled (or not) via the toggle on the start screen — no auto-start here,
+    // so workout narration can't race with a pending permission prompt.
+    beginExercise();
+  };
+
+})();
+</script>
+</body>
+</html>
