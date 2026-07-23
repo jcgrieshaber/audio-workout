@@ -227,14 +227,17 @@
 
   // ---------- Speech synthesis ----------
   const synth = window.speechSynthesis || null;
-  let listeningDucked = false; // true while the coach is talking; mic stays connected, we just ignore results
+  let listeningDucked = false; // true while the coach is talking
+  let duckStopping = false; // true when we stopped recognition ourselves to duck, vs. a real disconnect
   function speak(text, onEnd){
     logSay(text);
     captionText.textContent = text;
     if(micOn && recognition){
       listeningDucked = true;
+      duckStopping = true;
       micStatus.textContent = 'Coach speaking…';
       micDot.className = 'mic-dot off';
+      try{ recognition.stop(); }catch(e){} // actually stop, don't just ignore — prevents buffering our own audio
     }
     if(!synth){ if(onEnd) setTimeout(onEnd, 400); return; }
     synth.cancel();
@@ -242,13 +245,15 @@
     u.rate = 0.98; u.pitch = 1.0;
     u.onend = () => {
       if(micOn && recognition){
-        // Keep ignoring input for a beat after speech ends — recognition can finalize
-        // a transcript of the coach's own tail-end audio a little late.
+        // Short beat after speech ends before restarting the mic — avoids catching
+        // the tail end of the coach's own audio still resonating in the room.
         setTimeout(() => {
           if(!micOn) return;
           listeningDucked = false;
+          duckStopping = false;
           micStatus.textContent = 'Listening…';
           micDot.className = 'mic-dot live';
+          try{ recognition.start(); }catch(e){}
         }, 700);
       }
       if(onEnd) onEnd();
@@ -316,6 +321,11 @@
       logLine('<b>Mic:</b> connected, listening');
     };
     recognition.onend = () => {
+      if(duckStopping){
+        // We stopped this ourselves so the mic can't hear the coach talking — speak()'s
+        // own timer restarts it after a short cooldown. Nothing to do here.
+        return;
+      }
       if(isIOS && micOn && !micDenied){
         // Expected on iOS: each phrase ends its own session. This is a real standalone page
         // (not the chat sandbox), so permission persists and restarting here is safe.
